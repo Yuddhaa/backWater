@@ -10,7 +10,7 @@ dev: #install-air .air.toml
 build:
 	@echo "Building Go binary..."
 	# @mkdir -p tmp
-	@go build -o ./tmp/server ./main.go
+	@go build -o ./tmp/server ./...
 
 run: build
 	./tmp/server
