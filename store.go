@@ -17,7 +17,7 @@ func storeBodyVariables(testNo int, body []byte, variables variablesStruct, toSt
 		fmt.Println("Body is not JSON, skipping unmarshal.")
 		return true
 	}
-	fmt.Println("body:", string(body))
+	// fmt.Println("body:", string(body))
 	var tempBody map[string]any
 	if err := json.Unmarshal(body, &tempBody); err != nil {
 		fmt.Println("Error in Unmarshal of the body. Err:" + err.Error())

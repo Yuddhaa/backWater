@@ -54,7 +54,7 @@ func main() {
 
 	// Presetup of the tests
 	storeGlobalVariables(variables, input.Variables)
-	// printIndentJson("Global variables", variables)
+	printIndentJson("Global variables", variables)
 
 	total = len(input.Tests)
 	fmt.Printf("\n\t--- Total Number of Tests:%v ---\n\n", total)
@@ -78,11 +78,29 @@ func main() {
 		var ok bool
 		if test.Url, ok = processUrl(test.Url); !ok {
 			failed++
-			fmt.Printf("[FAIL] %v. Failed to process header.\n\n", testNo)
+			fmt.Printf("[FAIL] %v. Failed to process Url.\n\n", testNo)
 			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
 			continue
 		}
 		// printIndentJson("url before processing", test.Url)
+
+		// printIndentJson("expected_response before processing", test.ExpectedResponse)
+		if ok := processBody(test.ExpectedResponse); !ok {
+			failed++
+			fmt.Printf("[FAIL] %v. Failed to process expected_response.\n\n", testNo)
+			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
+			continue
+		}
+		// printIndentJson("expected_response after processing", test.ExpectedResponse)
+
+		printIndentJson("body before processing", test.Body)
+		if ok := processBody(test.Body); !ok {
+			failed++
+			fmt.Printf("[FAIL] %v. Failed to process Body.\n\n", testNo)
+			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
+			continue
+		}
+		printIndentJson("body after processing", test.Body)
 
 		var body io.Reader
 		// 3.1 convert body into io.Reader
