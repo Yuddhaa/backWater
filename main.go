@@ -11,8 +11,9 @@ import (
 )
 
 type inputType struct {
-	Name  string `json:"name"`
-	Tests []test `json:"tests"`
+	Name      string          `json:"name"`
+	Variables variablesStruct `json:"variables"`
+	Tests     []test          `json:"tests"`
 }
 
 type test struct {
@@ -23,6 +24,10 @@ type test struct {
 	ExpectedStatus   string            `json:"expected_status"`
 	ExpectedResponse any               `json:"expected_response"`
 }
+
+type variablesStruct map[string]any
+
+var variables = make(variablesStruct)
 
 func main() {
 	// 0. Variables
@@ -45,12 +50,27 @@ func main() {
 	}
 	fmt.Printf("\n\t--- Name: %v ---\n", input.Name)
 
+	// Presetup of the tests
+	storeGlobalVariables(variables, input.Variables)
+	printIndentJson("variables", variables)
+
 	total = len(input.Tests)
 	fmt.Printf("\n\t--- Total Number of Tests:%v ---\n\n", total)
 	// 3. do the testing
 	for _, test := range input.Tests {
 		testNo += 1
 		fmt.Printf("\n------------- Test %d: [%s] %s -------------\n", testNo, test.Method, test.Url)
+
+		// Pre processing of the tests
+		printIndentJson("header before processing", test.Header)
+		if ok := processHeader(test.Header); !ok {
+			failed++
+			fmt.Printf("[FAIL] %v. Failed to process header.\n\n", testNo)
+			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
+			continue
+		}
+		printIndentJson("header after processing", test.Header)
+
 		var body io.Reader
 		// 3.1 convert body into io.Reader
 		if test.Body != nil {
@@ -106,7 +126,7 @@ func main() {
 	fmt.Printf("Failed: %v\n", failed)
 }
 
-// func printIndentJson(v any) {
-// 	temp, _ := json.MarshalIndent(v, "", "    ")
-// 	fmt.Printf("%v\n", string(temp))
-// }
+func printIndentJson(s string, v any) {
+	temp, _ := json.MarshalIndent(v, "", "    ")
+	fmt.Printf("%v: %v\n", s, string(temp))
+}
