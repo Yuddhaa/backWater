@@ -16,6 +16,10 @@ func processHeader(header map[string]string) bool {
 	return true
 }
 
+func processUrl(url string) (string, bool) {
+	return processString(url)
+}
+
 func processString(str string) (string, bool) {
 	result := ""
 	firstPassed := false
@@ -30,9 +34,13 @@ func processString(str string) (string, bool) {
 		} else if v == "$" && firstPassed {
 			firstPassed = false
 			// result += variables[varName]
-			temp, ok := variables[varName].(string)
+			t, ok := variables[varName]
 			if !ok {
-				fmt.Printf("Error in converting variable %v to string.\n", varName)
+				fmt.Printf("%v is not present in variables.\n", varName)
+			}
+			temp, ok := t.(string)
+			if !ok {
+				fmt.Printf("Couldn't convert variable %v to string.\n", varName)
 				return "", false
 			}
 			result += temp

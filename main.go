@@ -17,12 +17,14 @@ type inputType struct {
 }
 
 type test struct {
+	Number           int               `json:"num"`
 	Method           string            `json:"method"`
 	Url              string            `json:"url"`
 	Header           map[string]string `json:"header"`
 	Body             any               `json:"body"`
 	ExpectedStatus   string            `json:"expected_status"`
 	ExpectedResponse any               `json:"expected_response"`
+	ToStore          map[string]string `json:"var_to_store"`
 }
 
 type variablesStruct map[string]any
@@ -52,24 +54,35 @@ func main() {
 
 	// Presetup of the tests
 	storeGlobalVariables(variables, input.Variables)
-	printIndentJson("variables", variables)
+	// printIndentJson("Global variables", variables)
 
 	total = len(input.Tests)
 	fmt.Printf("\n\t--- Total Number of Tests:%v ---\n\n", total)
 	// 3. do the testing
 	for _, test := range input.Tests {
 		testNo += 1
-		fmt.Printf("\n------------- Test %d: [%s] %s -------------\n", testNo, test.Method, test.Url)
+		fmt.Printf("\n------------- Test %d: [%s] %s -------------\n\n", testNo, test.Method, test.Url)
 
 		// Pre processing of the tests
-		printIndentJson("header before processing", test.Header)
+		// printIndentJson("header before processing", test.Header)
 		if ok := processHeader(test.Header); !ok {
 			failed++
 			fmt.Printf("[FAIL] %v. Failed to process header.\n\n", testNo)
 			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
 			continue
 		}
-		printIndentJson("header after processing", test.Header)
+		// printIndentJson("header after processing", test.Header)
+
+		// process url
+		// printIndentJson("url after processing", test.Url)
+		var ok bool
+		if test.Url, ok = processUrl(test.Url); !ok {
+			failed++
+			fmt.Printf("[FAIL] %v. Failed to process header.\n\n", testNo)
+			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
+			continue
+		}
+		// printIndentJson("url before processing", test.Url)
 
 		var body io.Reader
 		// 3.1 convert body into io.Reader
@@ -85,7 +98,8 @@ func main() {
 			// 3.1.2 Create a Reader from those bytes
 			body = bytes.NewBuffer(jsonData)
 		}
-		// 3.2 new request
+
+		// 3.2 new request and set the header
 		req, err = http.NewRequest(test.Method, test.Url, body)
 		if err != nil {
 			failed++
@@ -100,6 +114,8 @@ func main() {
 				req.Header.Set(k, v)
 			}
 		}
+
+		// Do the http call
 		res, err := client.Do(req)
 		if err != nil {
 			failed++
@@ -107,6 +123,18 @@ func main() {
 			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
 			continue
 		}
+
+		// Read the body
+		actualBody, err := io.ReadAll(res.Body)
+		if err != nil {
+			failed++
+			fmt.Printf("[FAIL] %v. Failed to process actual body.\n\n", testNo)
+			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
+			res.Body.Close()
+			continue
+		}
+
+		// Status validation
 		if res.Status != test.ExpectedStatus {
 			// fmt.Printf("------------- Test %v Failed-------------", testNo)
 			failed++
@@ -115,6 +143,12 @@ func main() {
 			passed++
 			fmt.Printf("[PASS] Status OK.\n")
 		}
+
+		// Store required body variables
+		if ok := storeBodyVariables(testNo, actualBody, variables, test.ToStore); !ok {
+			fmt.Printf("[NOTE] %v. Failed to store body variables.\n\n", testNo)
+		}
+
 		io.Copy(io.Discard, res.Body)
 		res.Body.Close()
 		fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
@@ -124,6 +158,8 @@ func main() {
 	fmt.Printf("\nTotal Number of Tests:%v\n", total)
 	fmt.Printf("Passed: %v\n", passed)
 	fmt.Printf("Failed: %v\n", failed)
+
+	printIndentJson("all variables", variables)
 }
 
 func printIndentJson(s string, v any) {
