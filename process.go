@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -153,12 +155,23 @@ func processString(str string) (string, bool) {
 				LogMsg("%v is not present in variables.\n", varName)
 				return "", false
 			}
-			temp, ok := t.(string)
-			if !ok {
-				LogMsg("Couldn't convert variable %v to string.\n", varName)
-				return "", false
+			// Handle different types (JSON numbers are float64 by default)
+			var replacement string
+			switch v := t.(type) {
+			case string:
+				replacement = v
+			case float64:
+				// FormatFloat with -1 removes trailing zeros (e.g., 123.0 -> "123")
+				replacement = strconv.FormatFloat(v, 'f', -1, 64)
+			case int:
+				replacement = strconv.Itoa(v)
+			case bool:
+				replacement = strconv.FormatBool(v)
+			default:
+				// Fallback for objects/arrays or other types
+				replacement = fmt.Sprintf("%v", v)
 			}
-			result += temp
+			result += replacement
 			varName = ""
 		}
 	}
