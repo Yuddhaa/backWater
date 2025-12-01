@@ -139,9 +139,8 @@ Here is a complete example showing authentication, variable usage, and validatio
 
 ## ⚠️ Known Limitations
 
-1.  **Array Indexing**: The JSON path parser currently supports single-digit array indices only (e.g., `items[0]` to `items[9]`). Double-digit indices (e.g., `items[10]`) may not function correctly.
-2.  **Strict JSON**: The configuration file must be valid JSON. Trailing commas are not allowed.
-3.  **Variable Scope**: Extracted variables are global to the runtime of the suite once stored.
+1.  **Strict JSON**: The configuration file must be valid JSON. Trailing commas are not allowed.
+2.  **Variable Scope**: Extracted variables are global to the runtime of the suite once stored.
 
 ## 🤝 Contributing
 

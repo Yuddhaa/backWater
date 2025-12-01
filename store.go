@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -17,90 +18,147 @@ func storeGlobalVariables(variables, input variablesStruct) {
 // storeBodyVariables extracts specific values from the HTTP response body based on
 // the 'toStore' map configuration. It namespaces the extracted variables with the
 // test number (e.g., "test_1_varName") and saves them to the global variables map.
-// Returns false if extraction fails or JSON is invalid.
-func storeBodyVariables(testNo int, body []byte, variables variablesStruct, toStore map[string]string) bool {
-	// 1. Basic validation to ensure the body looks like a JSON object or array
-	if len(body) == 0 || body[0] != '{' && body[0] != '[' {
-		fmt.Println("Body is not JSON, skipping unmarshal.")
+func storeBodyVariables(testNo int, body []byte, variables map[string]any, toStore map[string]string) bool {
+	// 1. Basic validation
+	body = bytes.TrimSpace(body)
+	if len(body) == 0 {
+		fmt.Println("Body is empty, skipping.")
 		return true
 	}
-	// fmt.Println("body:", string(body))
+	// Check if it looks like JSON (starts with { or [)
+	if body[0] != '{' && body[0] != '[' {
+		fmt.Printf("Body does not look like JSON (starts with '%c'), skipping unmarshal.\n", body[0])
+		return true
+	}
 
-	// 2. Unmarshal body into a generic map for traversal
-	var tempBody map[string]any
-	if err := json.Unmarshal(body, &tempBody); err != nil {
-		fmt.Println("Error in Unmarshal of the body. Err:" + err.Error())
+	// 2. Unmarshal into 'any'.
+	// This handles both Objects (map[string]any) and Arrays ([]any) automatically.
+	var bodyData any
+	if err := json.Unmarshal(body, &bodyData); err != nil {
+		fmt.Printf("Error in Unmarshal of the body. Err: %v\n", err)
 		return false
 	}
 
 	// 3. Iterate over the requested variables to extract
+	success := true
 	for k, v := range toStore {
 		// Construct the namespaced key: "test_{testNo}_{variableName}"
-		n := strconv.FormatInt(int64(testNo), 10)
-		varValue, ok := getNestedValue(v, tempBody)
+		// using Sprintf is cleaner than FormatInt manual concatenation
+		keyName := fmt.Sprintf("test_%d_%s", testNo, k)
+
+		// We just pass the generic bodyData.
+		// getNestedValue is smart enough to handle maps vs arrays.
+		varValue, ok := getNestedValue(v, bodyData)
 		if !ok {
-			return false
+			fmt.Printf("Failed to extract '%s' (path: %s).\n All the tests referencing this variable might fail.\n", k, v)
+			// We continue so we can try to find other variables even if one fails
+			continue
 		}
-		variables["test_"+n+"_"+k] = varValue
+
+		variables[keyName] = varValue
+		// Optional: Debug log
+		fmt.Printf("[NOTE] Stored %s = %v\n", keyName, varValue)
 	}
-	return true
+
+	return success
 }
 
 // getNestedValue retrieves a value from a generic JSON structure using a dot-notation path.
-// It supports array indexing (e.g., "data.items[0].id").
-// Returns the found value and a boolean indicating success.
+// It supports:
+// 1. Standard keys: "user.name"
+// 2. Array indices: "users[0].id"
+// 3. Multi-digit indices: "data[100]"
+// 4. Nested arrays: "grid[0][1]"
+// 5. Root arrays: "[0].name"
 func getNestedValue(path string, data any) (any, bool) {
-	keys := strings.Split(path, ".")
+	if path == "" {
+		return data, true
+	}
+
+	// 1. Split the path by dots (standard JSON traversal)
+	segments := strings.Split(path, ".")
 	current := data
 
-	// Traverse the data structure segment by segment
-	for _, key := range keys {
-		// Check for array notation (e.g., "items[0]")
-		iIdx := strings.Index(key, "[") + 1
-		var i int
-		var err error
-		isArr := false
+	for _, segment := range segments {
+		// Check if this segment contains an array notation like "items[0]"
+		bracketIdx := strings.Index(segment, "[")
 
-		// Parse array index if present
-		if iIdx > 0 {
-			i, err = strconv.Atoi(string(key[iIdx]))
-			if err != nil {
-				fmt.Printf("Invalid index in path: %v. Error:%v\n", path, err.Error())
-				return nil, false
-			}
-			// Strip the array notation from the key name for map lookup
-			key = strings.Split(key, "[")[0]
-			isArr = true
-		}
-
-		// Ensure current node is a map
-		m, mok := current.(map[string]any)
-		if !mok {
-			fmt.Printf("path segment '%s' not found or parent is not a map\n", key)
-			return nil, false
-		}
-
-		// Look up the key in the map
-		val, exists := m[key]
-		if !exists {
-			fmt.Printf("key '%s' not found\n", key)
-			return nil, false
-		}
-
-		// Handle array navigation if the key implied an array
-		if isArr {
-			fmt.Println("inside is arr if")
-			arr, ok := val.([]any)
+		// --- CASE A: Simple Map Key (e.g., "name") ---
+		if bracketIdx == -1 {
+			m, ok := current.(map[string]any)
 			if !ok {
-				fmt.Printf("path segment '%s' is not an array\n", key)
+				fmt.Printf("Path '%s' failed at segment '%s': current value is not a map (got type %T)\n", path, segment, current)
+				return nil, false // Current node is not a map
+			}
+			val, exists := m[segment]
+			if !exists {
+				fmt.Printf("Path '%s' failed at segment '%s': key not found in map\n", path, segment)
+				return nil, false // Key not found
+			}
+			current = val
+			continue
+		}
+
+		// --- CASE B: Key with Array Indices (e.g., "items[0]" or "[0]") ---
+
+		// 1. Separate the map key from the indices
+		// "items[0]" -> mapKey: "items", rest: "[0]"
+		// "[0]"      -> mapKey: "",      rest: "[0]"
+		mapKey := segment[:bracketIdx]
+		rest := segment[bracketIdx:]
+
+		// 2. Resolve the Map Key first (if it exists)
+		if mapKey != "" {
+			m, ok := current.(map[string]any)
+			if !ok {
+				fmt.Printf("Path '%s' failed at segment '%s': expected map for key '%s' but got type %T\n", path, segment, mapKey, current)
 				return nil, false
 			}
-			// Update current pointer to the specific array element
-			current = arr[i]
-		} else {
-			// Update current pointer to the map value
+			val, exists := m[mapKey]
+			if !exists {
+				fmt.Printf("Path '%s' failed at segment '%s': key '%s' not found in map\n", path, segment, mapKey)
+				return nil, false
+			}
 			current = val
 		}
+
+		// 3. Resolve Array Indices (Iterate because of cases like [0][1])
+		for len(rest) > 0 {
+			// Find the closing bracket
+			closeIdx := strings.Index(rest, "]")
+			if !strings.HasPrefix(rest, "[") || closeIdx == -1 {
+				fmt.Printf("Path '%s' failed at array parsing: malformed brackets in '%s'\n", path, rest)
+				return nil, false // Malformed path
+			}
+
+			// Parse the index number
+			indexStr := rest[1:closeIdx]
+			index, err := strconv.Atoi(indexStr)
+			if err != nil {
+				fmt.Printf("Path '%s' failed at array parsing: invalid index number '%s' in '%s'\n", path, indexStr, rest)
+				return nil, false // Invalid number
+			}
+
+			// Assert current node is an array
+			arr, ok := current.([]any)
+			if !ok {
+				fmt.Printf("Path '%s' failed: expected array at index [%d], but got type %T\n", path, index, current)
+				return nil, false // Not an array
+			}
+
+			// Bounds check (Critical for stability)
+			if index < 0 || index >= len(arr) {
+				fmt.Printf("Path '%s' failed: index [%d] out of bounds (array length is %d)\n", path, index, len(arr))
+				return nil, false // Index out of bounds
+			}
+
+			// Move current pointer
+			current = arr[index]
+
+			// Advance the string to check for more brackets (e.g. handle the "[1]" in "[0][1]")
+			rest = rest[closeIdx+1:]
+		}
 	}
+
 	return current, true
 }
