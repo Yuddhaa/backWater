@@ -1,6 +1,4 @@
-# 🌊 Backwater
-![icon](./icon/icon.png)
-<img src="./icon/icon.png" width="200">
+# <img src="./icon/icon.png" alt="icon" width="32" height="32"> Backwater
 
 
 **Backwater** is a lightweight, zero-dependency HTTP integration testing tool written in Go.
@@ -179,8 +177,8 @@ After running the tests, check the `./reports` folder. You will find an HTML fil
   * Diffs showing why a test failed.
   * Total execution time.
 
-![homepage](./icon/homepage.png)
-![sigle_test](./icon/single_test.png)
+<img src="./icon/homepage.png" width="600">
+<img src="./icon/single_test.png" width="600">
 
 -----
 
