@@ -19,6 +19,9 @@ func storeGlobalVariables(variables, input variablesStruct) {
 // the 'toStore' map configuration. It namespaces the extracted variables with the
 // test number (e.g., "test_1_varName") and saves them to the global variables map.
 func storeBodyVariables(testNo int, body []byte, variables map[string]any, toStore map[string]string) bool {
+	if toStore != nil {
+		return true
+	}
 	// 1. Basic validation
 	body = bytes.TrimSpace(body)
 	if len(body) == 0 {
@@ -27,7 +30,7 @@ func storeBodyVariables(testNo int, body []byte, variables map[string]any, toSto
 	}
 	// Check if it looks like JSON (starts with { or [)
 	if body[0] != '{' && body[0] != '[' {
-		LogMsg("Body does not look like JSON (starts with '%c'), skipping unmarshal.\n", body[0])
+		LogMsg("While storing variables, body does not look like JSON (starts with '%c'), so skipping storing of variables.\n", body[0])
 		return true
 	}
 

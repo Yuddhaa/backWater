@@ -61,13 +61,13 @@ func main() {
 		// Set the test number in the struct if not present (optional, but good for reporting)
 		t.Number = testNo
 
-		LogMsg("\n------------- Test %d: [%s] %s -------------\n\n", testNo, t.Method, t.Url)
-
 		// --- Variable Substitution & Pre-processing ---
 		if ok := t.preProcess(testNo); !ok {
 			failed++
 			continue
 		}
+
+		LogMsg("\n------------- Test %d: [%s] %s -------------\n\n", testNo, t.Method, t.Url)
 
 		var body io.Reader
 
@@ -135,26 +135,40 @@ func main() {
 			LogMsg("[PASS] Status OK.\n")
 		}
 
+		// 2. Body Check (Hybrid Validation)
 		bodyMatch := true
-		if !statusMatch {
-			// 2. Body Check (Subset Validation)
+		if statusMatch {
 			if t.ExpectedResponse != nil {
-				// Unmarshal actual body to 'any' for comparison
-				var actualJSON any
-				if err := json.Unmarshal(actualBody, &actualJSON); err != nil {
-					bodyMatch = false
-					LogMsg("[FAIL] Response body is not valid JSON, cannot validate against expected.\n")
-				} else {
-					if validateBody(t.ExpectedResponse, actualJSON) {
-						LogMsg("[PASS] Body Subset Match OK.\n")
+				// CASE A: Expectation is a simple string (e.g., "Not an admin")
+				// We compare against the raw string body directly.
+				if _, isString := t.ExpectedResponse.(string); isString {
+					actualString := string(actualBody)
+					// validateBody already handles string equality and "regex:" support
+					if validateBody(t.ExpectedResponse, actualString) {
+						LogMsg("[PASS] Body String Match OK.\n")
 					} else {
 						bodyMatch = false
-						LogMsg("[FAIL] Body Mismatch.\n")
+						LogMsg("[FAIL] Body Mismatch.\n\tExpected: %v\n\tGot:      %v\n", t.ExpectedResponse, actualString)
+					}
+				} else {
+					// CASE B: Expectation is Complex (Map/Array)
+					// We must unmarshal the actual body to validate structure.
+					var actualJSON any
+					if err := json.Unmarshal(actualBody, &actualJSON); err != nil {
+						bodyMatch = false
+						LogMsg("[FAIL] Response body is not valid JSON, cannot validate against expected structure.\n")
+					} else {
+						if validateBody(t.ExpectedResponse, actualJSON) {
+							LogMsg("[PASS] Body Subset Match OK.\n")
+						} else {
+							bodyMatch = false
+							LogMsg("[FAIL] Body Mismatch.\n")
+						}
 					}
 				}
 			}
 		} else {
-			LogMsg("[NOTE] since status did not match, skipping body validation.")
+			LogMsg("[NOTE] Status did not match, skipping body validation.\n")
 		}
 
 		if !statusMatch || !bodyMatch {
@@ -162,7 +176,7 @@ func main() {
 		} else {
 			passed++
 		}
-		// // Status validation
+		// Status validation
 		// if res.Status != t.ExpectedStatus {
 		// 	failed++
 		// 	LogMsg("[FAIL] %v: Status Mismatch.\n\tExpected: %s\n\tGot:      %s\n", testNo, t.ExpectedStatus, res.Status)

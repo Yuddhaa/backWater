@@ -10,10 +10,12 @@ import (
 // this func will in turn will call respective processing functions
 func (t *test) preProcess(testNo int) bool {
 	// Process Headers
-	if ok := processHeader(t.Header); !ok {
-		LogMsg("[FAIL] %v. Failed to process header.\n\n", testNo)
-		LogMsg("------------- Test %v Completed-------------\n\n", testNo)
-		return false
+	if t.Header != nil {
+		if ok := processHeader(t.Header); !ok {
+			LogMsg("[FAIL] %v. Failed to process header.\n\n", testNo)
+			LogMsg("------------- Test %v Completed-------------\n\n", testNo)
+			return false
+		}
 	}
 
 	// Process URL
@@ -26,18 +28,22 @@ func (t *test) preProcess(testNo int) bool {
 		return false
 	}
 
-	// Process Expected Response
-	if ok := processBody(t.ExpectedResponse); !ok {
-		LogMsg("[FAIL] %v. Failed to process expected_response.\n\n", testNo)
-		LogMsg("------------- Test %v Completed-------------\n\n", testNo)
-		return false
+	if t.ExpectedResponse != nil {
+		// Process Expected Response
+		if ok := processBody(t.ExpectedResponse); !ok {
+			LogMsg("[FAIL] %v. Failed to process expected_response.\n\n", testNo)
+			LogMsg("------------- Test %v Completed-------------\n\n", testNo)
+			return false
+		}
 	}
 
-	// Process Request Body
-	if ok := processBody(t.Body); !ok {
-		LogMsg("[FAIL] %v. Failed to process Body.\n\n", testNo)
-		LogMsg("------------- Test %v Completed-------------\n\n", testNo)
-		return false
+	if t.Body != nil {
+		// Process Request Body
+		if ok := processBody(t.Body); !ok {
+			LogMsg("[FAIL] %v. Failed to process Body.\n\n", testNo)
+			LogMsg("------------- Test %v Completed-------------\n\n", testNo)
+			return false
+		}
 	}
 	return true
 }
@@ -67,6 +73,9 @@ func processUrl(url string) (string, bool) {
 // and delegates to the appropriate processing function.
 // It supports dynamic JSON structures deserialized into 'any'.
 func processBody(data any) bool {
+	if _, isString := data.(string); isString {
+		return true
+	}
 	current, ok := data.(map[string]any)
 	if !ok {
 		// If not a map, check if it is a slice/array

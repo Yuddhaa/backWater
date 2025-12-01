@@ -15,13 +15,13 @@ type test struct {
 	Number           int               `json:"num"`
 	Method           string            `json:"method"`
 	Url              string            `json:"url"`
-	Header           map[string]string `json:"header"`
-	Body             any               `json:"body"`
+	Header           map[string]string `json:"header,omitempty"`
+	Body             any               `json:"body,omitempty"`
 	ActualStatus     string            `json:"actual_status"`
 	ExpectedStatus   string            `json:"expected_status"`
 	ActualResponse   string            `json:"actual_response"`
-	ExpectedResponse any               `json:"expected_response"`
-	ToStore          map[string]string `json:"var_to_store"`
+	ExpectedResponse any               `json:"expected_response,omitempty"`
+	ToStore          map[string]string `json:"var_to_store,omitempty"`
 	TimeTaken        string            `json:"time"`
 	Logs             []string          `json:"logs"`
 }
