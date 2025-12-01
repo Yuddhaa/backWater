@@ -72,7 +72,7 @@ func processBody(data any) bool {
 		// If not a map, check if it is a slice/array
 		current2, ok := data.([]any)
 		if !ok {
-			LogMsg("Given data doesn't seem to be either array or object")
+			LogMsg("Given data doesn't seem to be either array or object\n")
 			return false
 		} else {
 			return processArray(current2)
