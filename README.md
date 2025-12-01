@@ -1,4 +1,4 @@
-# <img src="./icon/icon.png" alt="icon" width="32" height="32"> Backwater
+# <img src="./icon/icon.png" alt="icon" width="28" height="28"> Backwater
 
 
 **Backwater** is a lightweight, zero-dependency HTTP integration testing tool written in Go.
