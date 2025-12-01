@@ -132,7 +132,7 @@ func main() {
 			LogMsg("[FAIL] %v: Status Mismatch.\n\tExpected: %s\n\tGot:      %s\n", testNo, t.ExpectedStatus, res.Status)
 		} else {
 			statusMatch = true
-			LogMsg("[PASS] Status OK.\n")
+			LogMsg("[PASS] HTTP Status Matched.\n")
 		}
 
 		// 2. Body Check (Hybrid Validation)
@@ -144,7 +144,7 @@ func main() {
 				if _, isString := t.ExpectedResponse.(string); isString {
 					actualString := string(actualBody)
 					// validateBody already handles string equality and "regex:" support
-					if validateBody(t.ExpectedResponse, actualString) {
+					if validateBody(t.ExpectedResponse, actualString, false) {
 						LogMsg("[PASS] Body String Match OK.\n")
 					} else {
 						bodyMatch = false
@@ -158,7 +158,7 @@ func main() {
 						bodyMatch = false
 						LogMsg("[FAIL] Response body is not valid JSON, cannot validate against expected structure.\n")
 					} else {
-						if validateBody(t.ExpectedResponse, actualJSON) {
+						if validateBody(t.ExpectedResponse, actualJSON, false) {
 							LogMsg("[PASS] Body Subset Match OK.\n")
 						} else {
 							bodyMatch = false
@@ -175,6 +175,7 @@ func main() {
 			failed++
 		} else {
 			passed++
+			t.Pass = true
 		}
 		// Status validation
 		// if res.Status != t.ExpectedStatus {

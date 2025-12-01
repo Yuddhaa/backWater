@@ -96,8 +96,7 @@ func GenerateHTMLReport(data inputType, totalTime string, total int, passed int)
 
 	// 3. Parse the Template
 	// Note: You might want to pass the template path as an arg or keep it relative
-	tmplPath := "./template.html"
-	tmplContent, err := os.ReadFile(tmplPath)
+	tmplContent, err := os.ReadFile(*template_file)
 	if err != nil {
 		fmt.Printf("Error reading template file: %v\n", err)
 		return

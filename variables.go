@@ -24,6 +24,7 @@ type test struct {
 	ToStore          map[string]string `json:"var_to_store,omitempty"`
 	TimeTaken        string            `json:"time"`
 	Logs             []string          `json:"logs"`
+	Pass             bool              `json:"pass"`
 }
 
 // variablesStruct is a map used to store dynamic values during test execution.

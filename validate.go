@@ -1,95 +1,115 @@
 package main
 
 import (
-	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
 )
 
-// validateBody checks if actual matches the structure/values of expected.
-// It implements "Expected <= Actual" logic (Subset Validation).
-// Now supports Regex strings and Unordered Array Subset Matching.
-func validateBody(expected, actual any) bool {
+// validateBody checks if actual matches expected (Subset + Regex + Unordered Array).
+// It now accepts 'quiet' bool. If true, it suppress logs (useful for speculative matching in arrays).
+// If false, it uses LogMsg to report specific mismatches.
+func validateBody(expected, actual any, quiet bool) bool {
 	if expected == nil {
 		return true
 	}
 
 	switch exp := expected.(type) {
 	case map[string]any:
-		// Actual must be a map
 		act, ok := actual.(map[string]any)
 		if !ok {
+			if !quiet {
+				LogMsg("[Validation Error] Expected JSON Object, got %T\n", actual)
+			}
 			return false
 		}
-		// Every key in Expected must exist in Actual and match value recursively
 		for k, vExp := range exp {
 			vAct, exists := act[k]
 			if !exists {
-				return false // Key missing in actual
+				if !quiet {
+					LogMsg("[Validation Error] Missing expected key: '%s'\n", k)
+				}
+				return false
 			}
-			if !validateBody(vExp, vAct) {
-				return false // Value mismatch
+			if !validateBody(vExp, vAct, quiet) {
+				if !quiet {
+					LogMsg("[Validation Error] Mismatch at key: '%s'\n", k)
+				}
+				return false
 			}
 		}
 		return true
 
 	case []any:
-		// Actual must be an array
 		act, ok := actual.([]any)
 		if !ok {
+			if !quiet {
+				LogMsg("[Validation Error] Expected JSON Array, got %T\n", actual)
+			}
 			return false
 		}
-		// Basic length check: Actual must contain at least as many items as Expected
 		if len(act) < len(exp) {
+			if !quiet {
+				LogMsg("[Validation Error] Actual array length (%d) is less than expected (%d)\n", len(act), len(exp))
+			}
 			return false
 		}
-
-		// Unordered Subset Match Strategy:
-		// For each item in 'expected', we must find a unique matching item in 'actual' (anywhere).
-		// We use matchedIndices to ensure we don't match the same actual item twice.
 		matchedIndices := make([]bool, len(act))
-
 		for _, expItem := range exp {
 			found := false
-			// Scan the entire actual array for a match
 			for j, actItem := range act {
 				if matchedIndices[j] {
-					continue // This actual item is already "consumed" by a previous expected item
+					continue
 				}
-				if validateBody(expItem, actItem) {
+				// Try match silently first
+				if validateBody(expItem, actItem, true) {
 					matchedIndices[j] = true
 					found = true
-					break // Match found for this expected item, move to next
+					break
 				}
 			}
-			// If we iterated through all actual items and found no match for this expected item
 			if !found {
+				if !quiet {
+					LogMsg("[Validation Error] Could not find match for expected item: %v\n", expItem)
+				}
 				return false
 			}
 		}
 		return true
 
 	case string:
-		// Regular String & Regex Support
 		actStr, ok := actual.(string)
 		if !ok {
+			if !quiet {
+				LogMsg("[Validation Error] Expected String, got %T\n", actual)
+			}
 			return false
 		}
 		if strings.HasPrefix(exp, "regex:") {
 			pattern := strings.TrimPrefix(exp, "regex:")
 			matched, err := regexp.MatchString(pattern, actStr)
 			if err != nil {
-				fmt.Printf("Invalid regex pattern: %s. Error: %v\n", pattern, err)
+				if !quiet {
+					LogMsg("[Validation Error] Invalid regex pattern '%s': %v\n", pattern, err)
+				}
 				return false
 			}
+			if !matched && !quiet {
+				LogMsg("[Validation Error] Value '%s' did not match regex '%s'\n", actStr, pattern)
+			}
 			return matched
+		}
+		if exp != actStr && !quiet {
+			LogMsg("[Validation Error] Expected string '%s', got '%s'\n", exp, actStr)
 		}
 		return exp == actStr
 
 	default:
-		// Primitives (float64, bool, etc.) must match exactly
-		return reflect.DeepEqual(expected, actual)
+		match := reflect.DeepEqual(expected, actual)
+		if !match && !quiet {
+			LogMsg("[Validation Error] Value mismatch. Expected %v (%T), Got %v (%T)\n", expected, expected, actual, actual)
+		}
+		return match
 	}
 }
 
