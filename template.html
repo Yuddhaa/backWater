@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backend Test Report - {{.Title}}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .json-block {
+            font-family: 'Consolas', 'Monaco', monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        details > summary {
+            list-style: none;
+        }
+        details > summary::-webkit-details-marker {
+            display: none;
+        }
+        /* Custom scrollbar for dark blocks */
+        .dark-scroll::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .dark-scroll::-webkit-scrollbar-track {
+            background: #1e293b; 
+        }
+        .dark-scroll::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+        .dark-scroll::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-slate-800 font-sans antialiased">
+
+    <!-- Navbar -->
+    <nav class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <i class="fa-solid fa-flask text-indigo-400 text-xl mr-3"></i>
+                    <span class="font-bold text-xl tracking-tight">{{.Title}}</span>
+                </div>
+                <div class="text-sm text-gray-400">
+                    <i class="fa-regular fa-clock mr-1"></i> {{.GeneratedAt}}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- Statistics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+            <!-- Total -->
+            <div class="bg-white rounded-lg shadow p-5 border-l-4 border-slate-500">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-slate-100 rounded-full p-3">
+                        <i class="fa-solid fa-list text-slate-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-xs font-medium text-gray-500 uppercase">Total Tests</p>
+                        <p class="text-xl font-bold text-gray-900">{{.TotalCount}}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Passed -->
+            <div class="bg-white rounded-lg shadow p-5 border-l-4 border-green-500">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-green-100 rounded-full p-3">
+                        <i class="fa-solid fa-check text-green-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-xs font-medium text-gray-500 uppercase">Passed</p>
+                        <p class="text-xl font-bold text-gray-900">{{.PassCount}}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Failed -->
+            <div class="bg-white rounded-lg shadow p-5 border-l-4 border-red-500">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-red-100 rounded-full p-3">
+                        <i class="fa-solid fa-times text-red-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-xs font-medium text-gray-500 uppercase">Failed</p>
+                        <p class="text-xl font-bold text-gray-900">{{.FailCount}}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Success Rate -->
+            <div class="bg-white rounded-lg shadow p-5 border-l-4 {{if ge .SuccessRate 100}}border-green-500{{else}}border-orange-500{{end}}">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-indigo-100 rounded-full p-3">
+                        <i class="fa-solid fa-chart-pie text-indigo-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-xs font-medium text-gray-500 uppercase">Success Rate</p>
+                        <p class="text-xl font-bold text-gray-900">{{.SuccessRate}}%</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Duration -->
+            <div class="bg-white rounded-lg shadow p-5 border-l-4 border-blue-500">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-blue-100 rounded-full p-3">
+                        <i class="fa-solid fa-stopwatch text-blue-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-xs font-medium text-gray-500 uppercase">Duration</p>
+                        <p class="text-xl font-bold text-gray-900">{{.TotalTime}}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Variables (Collapsed) -->
+        <details class="bg-white rounded-lg shadow mb-8 group">
+            <summary class="cursor-pointer p-4 font-semibold flex justify-between items-center bg-slate-50 rounded-t-lg hover:bg-slate-100 transition">
+                <span><i class="fa-solid fa-database mr-2 text-slate-500"></i> Global Variables State</span>
+                <i class="fa-solid fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
+            </summary>
+            <div class="p-4 border-t border-gray-100">
+                <div class="bg-slate-800 rounded-md p-4 overflow-x-auto dark-scroll max-h-64">
+                    <pre class="json-block text-xs text-green-400">{{.Data.Variables | prettyJSON}}</pre>
+                </div>
+            </div>
+        </details>
+
+        <!-- Test List -->
+        <div class="space-y-4">
+            {{range .Data.Tests}}
+            {{$passed := isPass .ActualStatus .ExpectedStatus}}
+            {{$testNum := .Number}}
+            
+            <details class="bg-white rounded-lg shadow group overflow-hidden border border-gray-200">
+                <summary class="cursor-pointer p-4 flex items-center justify-between hover:bg-gray-50 transition select-none">
+                    <div class="flex items-center space-x-4 min-w-0 flex-1">
+                        <!-- Status Icon -->
+                        <div class="flex-shrink-0">
+                            {{if $passed}}
+                                <div class="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                                    <i class="fa-solid fa-check"></i>
+                                </div>
+                            {{else}}
+                                <div class="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+                                    <i class="fa-solid fa-times"></i>
+                                </div>
+                            {{end}}
+                        </div>
+
+                        <!-- ID & Method -->
+                        <div class="flex items-center space-x-3">
+                            <span class="text-gray-400 font-mono text-sm">#{{.Number}}</span>
+                            <span class="px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wide {{methodColor .Method}}">
+                                {{.Method}}
+                            </span>
+                        </div>
+
+                        <!-- URL -->
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-medium text-gray-900 truncate font-mono" title="{{.Url}}">{{.Url}}</p>
+                        </div>
+                        
+                        <!-- Time Taken -->
+                        <div class="hidden sm:flex items-center text-gray-400 text-xs mr-4 font-mono">
+                            <i class="fa-regular fa-clock mr-1.5"></i> {{.TimeTaken}}
+                        </div>
+
+                        <!-- Status Badge -->
+                        <div class="hidden sm:block">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{statusColor .ActualStatus .ExpectedStatus}}">
+                                Got: {{.ActualStatus}}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="ml-4 flex-shrink-0">
+                        <i class="fa-solid fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform"></i>
+                    </div>
+                </summary>
+
+                <!-- Expanded Content -->
+                <div class="border-t border-gray-100 bg-gray-50 p-6">
+                    
+                    <!-- Top Info Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <!-- Request Section -->
+                        <div class="bg-white rounded border border-gray-200 p-4">
+                            <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 border-b pb-2">Request Details</h4>
+                            
+                            {{if .Header}}
+                            <div class="mb-4">
+                                <p class="text-xs font-semibold text-gray-500 mb-1">Headers</p>
+                                <div class="bg-slate-50 rounded p-2 border border-slate-100 max-h-32 overflow-auto">
+                                    {{range $k, $v := .Header}}
+                                        <div class="text-xs font-mono whitespace-nowrap">
+                                            <span class="text-slate-500 font-semibold">{{$k}}:</span> 
+                                            <span class="text-slate-800">{{$v}}</span>
+                                        </div>
+                                    {{end}}
+                                </div>
+                            </div>
+                            {{end}}
+
+                            <div class="mb-2">
+                                <p class="text-xs font-semibold text-gray-500 mb-1">Body</p>
+                                {{if .Body}}
+                                    <!-- Added max-h-96 and overflow-y-auto for scrolling -->
+                                    <div class="bg-slate-800 rounded p-3 overflow-x-auto overflow-y-auto max-h-96 dark-scroll">
+                                        <pre class="json-block text-xs text-blue-300">{{.Body | prettyJSON}}</pre>
+                                    </div>
+                                {{else}}
+                                    <span class="text-xs text-gray-400 italic">No Body Content</span>
+                                {{end}}
+                            </div>
+                        </div>
+
+                        <!-- Response Section -->
+                        <div class="bg-white rounded border border-gray-200 p-4 relative overflow-hidden">
+                            <!-- Status Indicator Strip -->
+                            <div class="absolute top-0 left-0 w-1 h-full {{if $passed}}bg-green-500{{else}}bg-red-500{{end}}"></div>
+                            
+                            <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 border-b pb-2 ml-2">Response Analysis</h4>
+
+                            <div class="flex justify-between mb-4 ml-2">
+                                <div>
+                                    <p class="text-xs text-gray-500">Expected Status</p>
+                                    <p class="font-mono text-sm font-bold text-gray-700">{{.ExpectedStatus}}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-xs text-gray-500">Actual Status</p>
+                                    <p class="font-mono text-sm font-bold {{if $passed}}text-green-600{{else}}text-red-600{{end}}">{{.ActualStatus}}</p>
+                                </div>
+                            </div>
+
+                            <!-- Expected Response Body (New Section) -->
+                            <div class="ml-2 mb-4">
+                                <p class="text-xs font-semibold text-gray-500 mb-1">Expected Response Body</p>
+                                {{if .ExpectedResponse}}
+                                    <div class="bg-slate-800 rounded p-3 overflow-x-auto overflow-y-auto max-h-96 dark-scroll">
+                                        <pre class="json-block text-xs text-purple-300">{{.ExpectedResponse | prettyJSON}}</pre>
+                                    </div>
+                                {{else}}
+                                    <span class="text-xs text-gray-400 italic">No Expected Body Configured</span>
+                                {{end}}
+                            </div>
+
+                            <!-- Actual Response Body -->
+                            <div class="ml-2">
+                                <p class="text-xs font-semibold text-gray-500 mb-1">Actual Response Body</p>
+                                {{if .ActualResponse}}
+                                    <!-- Increased max-h to 96 and ensured overflow-y-auto -->
+                                    <div class="bg-slate-800 rounded p-3 overflow-x-auto overflow-y-auto max-h-96 dark-scroll">
+                                        <pre class="json-block text-xs {{if $passed}}text-green-300{{else}}text-red-300{{end}}">{{.ActualResponse | prettyJSON}}</pre>
+                                    </div>
+                                {{else}}
+                                    <span class="text-xs text-gray-400 italic">No Response Content</span>
+                                {{end}}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Extraction Section (Only if ToStore exists) -->
+                    {{if .ToStore}}
+                    <div class="bg-indigo-50 rounded border border-indigo-100 p-4 mb-6">
+                        <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Variables Extracted</h4>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-xs text-left">
+                                <thead>
+                                    <tr class="border-b border-indigo-200">
+                                        <th class="pb-2 font-semibold text-indigo-800">Variable Name</th>
+                                        <th class="pb-2 font-semibold text-indigo-800">JSON Path</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="font-mono text-indigo-600">
+                                    {{range $k, $v := .ToStore}}
+                                    <tr>
+                                        <td class="pt-2 pr-4">test_{{$testNum}}_{{$k}}</td>
+                                        <td class="pt-2 text-gray-500">{{$v}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {{end}}
+
+                    <!-- Logs Section -->
+                    {{if .Logs}}
+                    <div class="bg-slate-900 rounded-lg overflow-hidden border border-slate-700">
+                        <div class="bg-slate-800 px-4 py-2 border-b border-slate-700 flex justify-between items-center">
+                            <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider"><i class="fa-solid fa-terminal mr-2"></i>Execution Logs</h4>
+                            <span class="text-xs text-slate-500 font-mono">stdout</span>
+                        </div>
+                        <div class="p-4 overflow-x-auto max-h-64 overflow-y-auto dark-scroll">
+                            <div class="font-mono text-xs text-slate-300 space-y-1">
+                                {{range .Logs}}
+                                <div class="whitespace-pre-wrap">{{.}}</div>
+                                {{end}}
+                            </div>
+                        </div>
+                    </div>
+                    {{end}}
+
+                </div>
+            </details>
+            {{end}}
+        </div>
+        
+        <footer class="mt-12 text-center text-xs text-gray-400">
+            Generated by BackWater &bull; <a href="#" class="hover:text-gray-600">Scroll to Top</a>
+        </footer>
+
+    </main>
+
+</body>
+</html>

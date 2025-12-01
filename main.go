@@ -12,12 +12,11 @@ import (
 	"time"
 )
 
-// main is the entry point of the test runner.
-// It orchestrates the loading of configuration, processing of variables,
-// execution of HTTP requests, and validation of results.
 func main() {
 	// Parse command line flags
-	path := flag.String("path", "./test.json", "path of the test json file. Default value: ./test.json")
+	path = flag.String("path", "./test.json", "path of the test json file")
+	output_dir = flag.String("output_dir", "./reports", "directory path for the report. Default: ./reports")
+	template_file = flag.String("template", "./template.html", "template refers to template.html file path from which reports are generated. Default: ./template.html")
 	flag.Parse()
 
 	// Initialize execution variables
@@ -44,92 +43,61 @@ func main() {
 
 	// Load global variables defined in the config
 	storeGlobalVariables(variables, input.Variables)
-	// printIndentJson("Global variables", variables)
 
 	total = len(input.Tests)
 	fmt.Printf("\n\t--- Total Number of Tests:%v ---\n\n", total)
 
 	start := time.Now()
+
 	// 3. Iterate through and execute tests
-	for i, test := range input.Tests {
+	for i := range input.Tests {
+		// Use a pointer to the current test so updates (Url, Logs, etc.) are reflected directly
+		t = &input.Tests[i]
+		// Test = &input.Tests[i]
+
 		testStart := time.Now()
 		testNo += 1
-		fmt.Printf("\n------------- Test %d: [%s] %s -------------\n\n", testNo, test.Method, test.Url)
+
+		// Set the test number in the struct if not present (optional, but good for reporting)
+		t.Number = testNo
+
+		LogMsg("\n------------- Test %d: [%s] %s -------------\n\n", testNo, t.Method, t.Url)
 
 		// --- Variable Substitution & Pre-processing ---
-
-		// Process Headers
-		// printIndentJson("header before processing", test.Header)
-		if ok := processHeader(test.Header); !ok {
+		if ok := t.preProcess(testNo); !ok {
 			failed++
-			fmt.Printf("[FAIL] %v. Failed to process header.\n\n", testNo)
-			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
 			continue
 		}
-		// printIndentJson("header after processing", test.Header)
-
-		// Process URL (substitute variables in the path)
-		// printIndentJson("url after processing", test.Url)
-		var ok bool
-		if test.Url, ok = processUrl(test.Url); !ok {
-			failed++
-			fmt.Printf("[FAIL] %v. Failed to process Url.\n\n", testNo)
-			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
-			continue
-		}
-		// printIndentJson("url before processing", test.Url)
-
-		// Process Expected Response (substitute variables for validation)
-		// printIndentJson("expected_response before processing", test.ExpectedResponse)
-		if ok := processBody(test.ExpectedResponse); !ok {
-			failed++
-			fmt.Printf("[FAIL] %v. Failed to process expected_response.\n\n", testNo)
-			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
-			continue
-		}
-		// printIndentJson("expected_response after processing", test.ExpectedResponse)
-
-		// Process Request Body (substitute variables in the payload)
-		// printIndentJson("body before processing", test.Body)
-		if ok := processBody(test.Body); !ok {
-			failed++
-			fmt.Printf("[FAIL] %v. Failed to process Body.\n\n", testNo)
-			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
-			continue
-		}
-		// printIndentJson("body after processing", test.Body)
 
 		var body io.Reader
 
 		// --- Request Construction ---
 
 		// 3.1 Convert body into io.Reader if body exists
-		if test.Body != nil {
-			// 3.1.1. Convert the generic 'any' back into JSON bytes
-			jsonData, err := json.Marshal(test.Body)
+		if t.Body != nil {
+			jsonData, err := json.Marshal(t.Body)
 			if err != nil {
 				failed++
-				fmt.Printf("[FAIL] %v. Invalid JSON body in test config: %v\n\n", testNo, err)
-				fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
+				LogMsg("[FAIL] %v: Invalid JSON body in test config: %v\n\n", testNo, err)
+				LogMsg("------------- Test %v Completed-------------\n\n", testNo)
 				continue
 			}
-			// 3.1.2 Create a Reader from those bytes
 			body = bytes.NewBuffer(jsonData)
 		}
 
 		// 3.2 Create new request
-		req, err = http.NewRequest(test.Method, test.Url, body)
+		req, err = http.NewRequest(t.Method, t.Url, body)
 		if err != nil {
 			failed++
-			fmt.Printf("[FAIL] %v Could not create request: %v\n\n", testNo, err)
-			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
+			LogMsg("[FAIL] %v: Could not create request: %v\n\n", testNo, err)
+			LogMsg("------------- Test %v Completed-------------\n\n", testNo)
 			continue
 		}
 		req.Header.Set("Content-Type", "application/json")
 
 		// 3.3 Set custom headers if present
-		if test.Header != nil {
-			for k, v := range test.Header {
+		if t.Header != nil {
+			for k, v := range t.Header {
 				req.Header.Set(k, v)
 			}
 		}
@@ -140,8 +108,8 @@ func main() {
 		res, err := client.Do(req)
 		if err != nil {
 			failed++
-			fmt.Printf("[FAIL] %v Network error: %v\n\n", testNo, err)
-			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
+			LogMsg("[FAIL] %v: Network error: %v\n\n", testNo, err)
+			LogMsg("------------- Test %v Completed-------------\n\n", testNo)
 			continue
 		}
 
@@ -149,39 +117,75 @@ func main() {
 		actualBody, err := io.ReadAll(res.Body)
 		if err != nil {
 			failed++
-			fmt.Printf("[FAIL] %v. Failed to process actual body.\n\n", testNo)
-			fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
+			LogMsg("[FAIL] %v: Failed to process actual body.\n\n", testNo)
+			LogMsg("------------- Test %v Completed-------------\n\n", testNo)
 			res.Body.Close()
 			continue
 		}
-		input.Tests[i].ActualStatus = res.Status
-		input.Tests[i].ActualResponse = string(actualBody)
+		t.ActualStatus = res.Status
+		t.ActualResponse = string(actualBody)
 
 		// --- Validation ---
-
-		// Status validation
-		if res.Status != test.ExpectedStatus {
-			// fmt.Printf("------------- Test %v Failed-------------", testNo)
-			failed++
-			fmt.Printf("[FAIL] %v Status Mismatch.\n\tExpected: %s\n\tGot:      %s\n", testNo, test.ExpectedStatus, res.Status)
+		// 1. Status Check
+		statusMatch := false
+		if res.Status != t.ExpectedStatus {
+			LogMsg("[FAIL] %v: Status Mismatch.\n\tExpected: %s\n\tGot:      %s\n", testNo, t.ExpectedStatus, res.Status)
 		} else {
-			passed++
-			fmt.Printf("[PASS] Status OK.\n")
+			statusMatch = true
+			LogMsg("[PASS] Status OK.\n")
 		}
 
-		// Store required body variables for future tests
-		if ok := storeBodyVariables(testNo, actualBody, variables, test.ToStore); !ok {
-			fmt.Printf("[NOTE] %v. Failed to store body variables.\n\n", testNo)
+		bodyMatch := true
+		if !statusMatch {
+			// 2. Body Check (Subset Validation)
+			if t.ExpectedResponse != nil {
+				// Unmarshal actual body to 'any' for comparison
+				var actualJSON any
+				if err := json.Unmarshal(actualBody, &actualJSON); err != nil {
+					bodyMatch = false
+					LogMsg("[FAIL] Response body is not valid JSON, cannot validate against expected.\n")
+				} else {
+					if validateBody(t.ExpectedResponse, actualJSON) {
+						LogMsg("[PASS] Body Subset Match OK.\n")
+					} else {
+						bodyMatch = false
+						LogMsg("[FAIL] Body Mismatch.\n")
+					}
+				}
+			}
+		} else {
+			LogMsg("[NOTE] since status did not match, skipping body validation.")
+		}
+
+		if !statusMatch || !bodyMatch {
+			failed++
+		} else {
+			passed++
+		}
+		// // Status validation
+		// if res.Status != t.ExpectedStatus {
+		// 	failed++
+		// 	LogMsg("[FAIL] %v: Status Mismatch.\n\tExpected: %s\n\tGot:      %s\n", testNo, t.ExpectedStatus, res.Status)
+		// } else {
+		// 	passed++
+		// 	LogMsg("[PASS] Status OK.\n")
+		// }
+		//
+		// Store required body variables
+		if ok := storeBodyVariables(testNo, actualBody, variables, t.ToStore); !ok {
+			LogMsg("[NOTE] %v: Failed to store body variables.\n\n", testNo)
+		} else if len(t.ToStore) > 0 {
+			LogMsg("Variables stored successfully.\n")
 		}
 
 		// Cleanup
-		io.Copy(io.Discard, res.Body)
+		// io.Copy(io.Discard, res.Body)
 		res.Body.Close()
-		testTime := time.Since(testStart).String()
-		input.Tests[i].TimeTaken = testTime
-		fmt.Printf("Test took %v\n", testTime)
-		fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
+		t.TimeTaken = time.Since(testStart).String()
+		LogMsg("Test took %v\n", t.TimeTaken)
+		LogMsg("------------- Test %v Completed-------------\n\n", testNo)
 	}
+
 	totalAllTestTime := time.Since(start).String()
 
 	// Final Report
@@ -191,11 +195,20 @@ func main() {
 	fmt.Printf("Failed: %v\n", failed)
 	fmt.Printf("Total time elapsed:%v\n", totalAllTestTime)
 
-	GenerateHTMLReport(input, totalAllTestTime, total, passed, "report.html")
-	// printIndentJson("all variables", variables)
+	GenerateHTMLReport(input, totalAllTestTime, total, passed)
 }
 
-// printIndentJson formats and prints a data structure as indented JSON for debugging purposes.
+// LogMsg prints to console and appends to the logs of the specific test case.
+// It accepts a pointer to the test struct so it can be called from other files (store.go, process.go).
+func LogMsg(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	fmt.Print(msg) // Print to standard output
+	if t != nil {
+		t.Logs = append(t.Logs, msg)
+	}
+}
+
+// Helper to print indented JSON (not used in main loop anymore, but kept for util)
 func printIndentJson(s string, v any) {
 	temp, _ := json.MarshalIndent(v, "", "    ")
 	fmt.Printf("%v: %v\n", s, string(temp))

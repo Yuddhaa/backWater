@@ -1,9 +1,44 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 )
+
+// preProcess is the main func for pre processing of the datas.
+// this func will in turn will call respective processing functions
+func (t *test) preProcess(testNo int) bool {
+	// Process Headers
+	if ok := processHeader(t.Header); !ok {
+		LogMsg("[FAIL] %v. Failed to process header.\n\n", testNo)
+		LogMsg("------------- Test %v Completed-------------\n\n", testNo)
+		return false
+	}
+
+	// Process URL
+	var ok bool
+	// Update the struct directly via the pointer
+	t.Url, ok = processUrl(t.Url)
+	if !ok {
+		LogMsg("[FAIL] %v. Failed to process Url.\n\n", testNo)
+		LogMsg("------------- Test %v Completed-------------\n\n", testNo)
+		return false
+	}
+
+	// Process Expected Response
+	if ok := processBody(t.ExpectedResponse); !ok {
+		LogMsg("[FAIL] %v. Failed to process expected_response.\n\n", testNo)
+		LogMsg("------------- Test %v Completed-------------\n\n", testNo)
+		return false
+	}
+
+	// Process Request Body
+	if ok := processBody(t.Body); !ok {
+		LogMsg("[FAIL] %v. Failed to process Body.\n\n", testNo)
+		LogMsg("------------- Test %v Completed-------------\n\n", testNo)
+		return false
+	}
+	return true
+}
 
 // processHeader iterates through the provided header map and performs variable substitution
 // on all values. It modifies the map in-place.
@@ -35,7 +70,7 @@ func processBody(data any) bool {
 		// If not a map, check if it is a slice/array
 		current2, ok := data.([]any)
 		if !ok {
-			fmt.Println("Given data doesn't seem to be either array or object")
+			LogMsg("Given data doesn't seem to be either array or object")
 			return false
 		} else {
 			return processArray(current2)
@@ -115,12 +150,12 @@ func processString(str string) (string, bool) {
 			// result += variables[varName]
 			t, ok := variables[varName]
 			if !ok {
-				fmt.Printf("%v is not present in variables.\n", varName)
+				LogMsg("%v is not present in variables.\n", varName)
 				return "", false
 			}
 			temp, ok := t.(string)
 			if !ok {
-				fmt.Printf("Couldn't convert variable %v to string.\n", varName)
+				LogMsg("Couldn't convert variable %v to string.\n", varName)
 				return "", false
 			}
 			result += temp
