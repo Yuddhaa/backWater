@@ -9,36 +9,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 )
-
-// inputType represents the root structure of the configuration file.
-// It contains the suite name, global variables, and the list of tests to execute.
-type inputType struct {
-	Name      string          `json:"name"`
-	Variables variablesStruct `json:"variables"`
-	Tests     []test          `json:"tests"`
-}
-
-// test defines the configuration for a single integration test step.
-// It includes request details (Method, URL, Body), expected outcomes,
-// and instructions on data extraction (ToStore).
-type test struct {
-	Number           int               `json:"num"`
-	Method           string            `json:"method"`
-	Url              string            `json:"url"`
-	Header           map[string]string `json:"header"`
-	Body             any               `json:"body"`
-	ExpectedStatus   string            `json:"expected_status"`
-	ExpectedResponse any               `json:"expected_response"`
-	ToStore          map[string]string `json:"var_to_store"`
-}
-
-// variablesStruct is a map used to store dynamic values during test execution.
-// It holds both global configuration variables and values extracted from responses.
-type variablesStruct map[string]any
-
-// variables holds the state of all stored values throughout the lifecycle of the application.
-var variables = make(variablesStruct)
 
 // main is the entry point of the test runner.
 // It orchestrates the loading of configuration, processing of variables,
@@ -77,8 +49,10 @@ func main() {
 	total = len(input.Tests)
 	fmt.Printf("\n\t--- Total Number of Tests:%v ---\n\n", total)
 
+	start := time.Now()
 	// 3. Iterate through and execute tests
-	for _, test := range input.Tests {
+	for i, test := range input.Tests {
+		testStart := time.Now()
 		testNo += 1
 		fmt.Printf("\n------------- Test %d: [%s] %s -------------\n\n", testNo, test.Method, test.Url)
 
@@ -180,6 +154,8 @@ func main() {
 			res.Body.Close()
 			continue
 		}
+		input.Tests[i].ActualStatus = res.Status
+		input.Tests[i].ActualResponse = string(actualBody)
 
 		// --- Validation ---
 
@@ -201,15 +177,21 @@ func main() {
 		// Cleanup
 		io.Copy(io.Discard, res.Body)
 		res.Body.Close()
+		testTime := time.Since(testStart).String()
+		input.Tests[i].TimeTaken = testTime
+		fmt.Printf("Test took %v\n", testTime)
 		fmt.Printf("------------- Test %v Completed-------------\n\n", testNo)
 	}
+	totalAllTestTime := time.Since(start).String()
 
 	// Final Report
 	fmt.Println("------------------- Test Ended -------------------")
 	fmt.Printf("\nTotal Number of Tests:%v\n", total)
 	fmt.Printf("Passed: %v\n", passed)
 	fmt.Printf("Failed: %v\n", failed)
+	fmt.Printf("Total time elapsed:%v\n", totalAllTestTime)
 
+	GenerateHTMLReport(input, totalAllTestTime, total, passed, "report.html")
 	// printIndentJson("all variables", variables)
 }
 
