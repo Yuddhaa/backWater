@@ -1,5 +1,8 @@
 tmp
+.DS_Store
 
 test.json
 mainTest.json
 test.txt
+reports/*
+reports

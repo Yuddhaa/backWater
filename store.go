@@ -22,12 +22,12 @@ func storeBodyVariables(testNo int, body []byte, variables map[string]any, toSto
 	// 1. Basic validation
 	body = bytes.TrimSpace(body)
 	if len(body) == 0 {
-		fmt.Println("Body is empty, skipping.")
+		LogMsg("Body is empty, skipping.")
 		return true
 	}
 	// Check if it looks like JSON (starts with { or [)
 	if body[0] != '{' && body[0] != '[' {
-		fmt.Printf("Body does not look like JSON (starts with '%c'), skipping unmarshal.\n", body[0])
+		LogMsg("Body does not look like JSON (starts with '%c'), skipping unmarshal.\n", body[0])
 		return true
 	}
 
@@ -35,7 +35,7 @@ func storeBodyVariables(testNo int, body []byte, variables map[string]any, toSto
 	// This handles both Objects (map[string]any) and Arrays ([]any) automatically.
 	var bodyData any
 	if err := json.Unmarshal(body, &bodyData); err != nil {
-		fmt.Printf("Error in Unmarshal of the body. Err: %v\n", err)
+		LogMsg("Error in Unmarshal of the body. Err: %v\n", err)
 		return false
 	}
 
@@ -50,14 +50,14 @@ func storeBodyVariables(testNo int, body []byte, variables map[string]any, toSto
 		// getNestedValue is smart enough to handle maps vs arrays.
 		varValue, ok := getNestedValue(v, bodyData)
 		if !ok {
-			fmt.Printf("Failed to extract '%s' (path: %s).\n All the tests referencing this variable might fail.\n", k, v)
+			LogMsg("Failed to extract '%s' (path: %s).\n All the tests referencing this variable might fail.\n", k, v)
 			// We continue so we can try to find other variables even if one fails
 			continue
 		}
 
 		variables[keyName] = varValue
 		// Optional: Debug log
-		fmt.Printf("[NOTE] Stored %s = %v\n", keyName, varValue)
+		LogMsg("[NOTE] Stored %s = %v\n", keyName, varValue)
 	}
 
 	return success
@@ -87,12 +87,12 @@ func getNestedValue(path string, data any) (any, bool) {
 		if bracketIdx == -1 {
 			m, ok := current.(map[string]any)
 			if !ok {
-				fmt.Printf("Path '%s' failed at segment '%s': current value is not a map (got type %T)\n", path, segment, current)
+				LogMsg("Path '%s' failed at segment '%s': current value is not a map (got type %T)\n", path, segment, current)
 				return nil, false // Current node is not a map
 			}
 			val, exists := m[segment]
 			if !exists {
-				fmt.Printf("Path '%s' failed at segment '%s': key not found in map\n", path, segment)
+				LogMsg("Path '%s' failed at segment '%s': key not found in map\n", path, segment)
 				return nil, false // Key not found
 			}
 			current = val
@@ -111,12 +111,12 @@ func getNestedValue(path string, data any) (any, bool) {
 		if mapKey != "" {
 			m, ok := current.(map[string]any)
 			if !ok {
-				fmt.Printf("Path '%s' failed at segment '%s': expected map for key '%s' but got type %T\n", path, segment, mapKey, current)
+				LogMsg("Path '%s' failed at segment '%s': expected map for key '%s' but got type %T\n", path, segment, mapKey, current)
 				return nil, false
 			}
 			val, exists := m[mapKey]
 			if !exists {
-				fmt.Printf("Path '%s' failed at segment '%s': key '%s' not found in map\n", path, segment, mapKey)
+				LogMsg("Path '%s' failed at segment '%s': key '%s' not found in map\n", path, segment, mapKey)
 				return nil, false
 			}
 			current = val
@@ -127,7 +127,7 @@ func getNestedValue(path string, data any) (any, bool) {
 			// Find the closing bracket
 			closeIdx := strings.Index(rest, "]")
 			if !strings.HasPrefix(rest, "[") || closeIdx == -1 {
-				fmt.Printf("Path '%s' failed at array parsing: malformed brackets in '%s'\n", path, rest)
+				LogMsg("Path '%s' failed at array parsing: malformed brackets in '%s'\n", path, rest)
 				return nil, false // Malformed path
 			}
 
@@ -135,20 +135,20 @@ func getNestedValue(path string, data any) (any, bool) {
 			indexStr := rest[1:closeIdx]
 			index, err := strconv.Atoi(indexStr)
 			if err != nil {
-				fmt.Printf("Path '%s' failed at array parsing: invalid index number '%s' in '%s'\n", path, indexStr, rest)
+				LogMsg("Path '%s' failed at array parsing: invalid index number '%s' in '%s'\n", path, indexStr, rest)
 				return nil, false // Invalid number
 			}
 
 			// Assert current node is an array
 			arr, ok := current.([]any)
 			if !ok {
-				fmt.Printf("Path '%s' failed: expected array at index [%d], but got type %T\n", path, index, current)
+				LogMsg("Path '%s' failed: expected array at index [%d], but got type %T\n", path, index, current)
 				return nil, false // Not an array
 			}
 
 			// Bounds check (Critical for stability)
 			if index < 0 || index >= len(arr) {
-				fmt.Printf("Path '%s' failed: index [%d] out of bounds (array length is %d)\n", path, index, len(arr))
+				LogMsg("Path '%s' failed: index [%d] out of bounds (array length is %d)\n", path, index, len(arr))
 				return nil, false // Index out of bounds
 			}
 
