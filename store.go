@@ -19,7 +19,7 @@ func storeGlobalVariables(variables, input variablesStruct) {
 // the 'toStore' map configuration. It namespaces the extracted variables with the
 // test number (e.g., "test_1_varName") and saves them to the global variables map.
 func storeBodyVariables(testNo int, body []byte, variables map[string]any, toStore map[string]string) bool {
-	if toStore != nil {
+	if toStore == nil {
 		return true
 	}
 	// 1. Basic validation
